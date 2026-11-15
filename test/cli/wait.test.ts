@@ -177,6 +177,20 @@ describe.skipIf(isProd)("CLI wait", () => {
     expect(r.stderr).toContain("No saved token");
   });
 
+  it("--init on an EMPTY room still delivers the first message (no start-from-now skip)", async () => {
+    const empty = JSON.parse(cli("create", uniqueName("wait-empty"), "--name", "lead2", "--password", "pw", "--json"));
+    cli("wait", empty.roomId, "--name", "lead2", "--init");
+    expect(existsSync(join(home, ".joincloud", `wait-${empty.roomId}-lead2.json`))).toBe(true);
+    // a message lands BEFORE the first real wait starts
+    const peer = JSON.parse(cli("join", empty.roomId, "--name", "w", "--password", "pw", "--detach"));
+    await sendMsg(peer.agentToken, "for you", "lead2");
+    const r = await new Promise<{ code: number; out: string }>((resolve) =>
+      execFile("node", ["dist/cli.js", "wait", empty.roomId, "--name", "lead2", "--url", SERVER, "--debounce", "0", "--timeout", "5"],
+        { encoding: "utf-8", env }, (err: any, stdout) => resolve({ code: err ? (err.code ?? 1) : 0, out: stdout.trim() })));
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.out).body).toBe("for you");
+  });
+
   it("keeps its cursor in the state dir", () => {
     expect(existsSync(join(home, ".joincloud", `wait-${room}-worker-1.json`))).toBe(true);
   });

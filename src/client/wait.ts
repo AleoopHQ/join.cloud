@@ -160,7 +160,12 @@ export async function waitForMessages(opts: WaitOptions): Promise<WaitResult> {
   const first = await messagesAfter(opts.rpc, roomId, opts.agentToken, cursor);
 
   if (opts.init) {
-    if (!opts.peek) saveCursor(statePath, advanceCursor(cursor, first));
+    // An empty room has no message to point at. Save an EMPTY cursor ("from
+    // the start") rather than nothing: with no state file, the next wait
+    // starts from *now* and silently skips whatever arrived in between -- which
+    // lost a worker's first exit notice to a lead whose room-up ran --init on a
+    // brand-new room (2026-11-15).
+    if (!opts.peek) saveCursor(statePath, advanceCursor(cursor, first) ?? { ts: "", ids: [] });
     return { roomId, messages: [], timedOut: false };
   }
   // First run with no state file: do not replay the room's whole history at
