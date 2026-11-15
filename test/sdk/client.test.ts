@@ -503,8 +503,6 @@ describe("SDK Room admin methods", () => {
     const jc = client();
     const info = await jc.roomInfo(rName);
 
-    await expect(room.update({ description: "Updated", type: "channel" })).resolves.toBeUndefined();
-    const info = await jc.roomInfo(name);
     expect(info.description).toBe("Updated");
     expect(info.type).toBe("channel");
   });
