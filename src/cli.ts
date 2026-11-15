@@ -193,6 +193,7 @@ if (hasFlag("server")) {
       case "wait": {
         const room = args[args.indexOf("wait") + 1];
         const name = flag("name");
+        if (hasFlag("help")) { help(); break; }
         if (!room || room.startsWith("--") || !name) {
           console.error("Usage: joincloud wait <room> --name <name> [--token T] [--state FILE] [--debounce S] [--timeout S] [--peek] [--init]");
           process.exit(1);

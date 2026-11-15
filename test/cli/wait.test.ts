@@ -167,6 +167,10 @@ describe.skipIf(isProd)("CLI wait", () => {
     expect(b.messages.map((m) => m.body)).toEqual(["@worker-1 peek"]);
   });
 
+  it("wait --help exits 0 and documents wait", () => {
+    expect(cli("wait", "--help")).toContain("joincloud wait");
+  });
+
   it("fails loudly (exit 1) without a token", async () => {
     const r = await wait("nobody", "--timeout", "2");
     expect(r.code).toBe(1);
