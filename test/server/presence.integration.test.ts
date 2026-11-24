@@ -29,6 +29,7 @@ describe.skipIf(isProd)("presence watchdog (own server, grace 1s)", () => {
         err ? reject(new Error(`${err.message}\n${stderr}`)) : resolve(stdout.trim())));
 
   let servers: { httpServer: any; mcpServer: any };
+  let presence: () => import("../../src/server/presence.js").PresenceTracker;
   let roomId: string;
   let leadToken: string;
   let workerToken: string;
@@ -88,6 +89,8 @@ describe.skipIf(isProd)("presence watchdog (own server, grace 1s)", () => {
     process.env.JOINCLOUD_DATA_DIR = dataDir;
     process.env.JOINCLOUD_PRESENCE_GRACE_SEC = String(GRACE_SEC);
     const { createDefaultServer, startServer } = await import("../../src/server/index.js");
+    const bot = await import("../../src/server/bot.js");
+    presence = () => bot.getPresence()!;
     const server = createDefaultServer();
     await server.store.init();
     servers = startServer(server);
@@ -104,8 +107,9 @@ describe.skipIf(isProd)("presence watchdog (own server, grace 1s)", () => {
     roomId = created.roomId;
     leadToken = created.agentToken;
     workerToken = JSON.parse(await cli("join", roomId, "--name", "worker-1", "--password", "pw", "--detach")).agentToken;
-    // `join --detach` itself opens and closes an SSE stream, which arms the
-    // timer; the daemon subscribing inside the grace period disarms it.
+    // `join --detach` opens no SSE stream, so nothing is tracked until the
+    // "daemon" subscribes.
+    expect(presence().tracked(roomId, "worker-1")).toBe(false);
     daemon = await subscribe(workerToken);
     await cli("wait", roomId, "--name", "lead", "--init");
   });
@@ -115,6 +119,25 @@ describe.skipIf(isProd)("presence watchdog (own server, grace 1s)", () => {
     servers?.mcpServer.close();
     rmSync(home, { recursive: true, force: true });
     rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("one-shot CLI commands from a fresh identity open no SSE stream and never alert", async () => {
+    // The wake daemon posts turn-end notices as `wake-<worker>` with `send`.
+    const who = "wake-worker-1";
+    await cli("join", roomId, "--name", who, "--password", "pw", "--detach");
+    await cli("send", roomId, "turn ended", "--name", who, "--password", "pw");
+    await cli("history", roomId, "--password", "pw");
+    await cli("unread", roomId, "--password", "pw");
+    await cli("send", roomId, "turn ended again", "--name", who, "--password", "pw", "--to", "lead");
+    expect(presence().tracked(roomId, who)).toBe(false);
+    expect(presence().pending(roomId, who)).toBe(false);
+    await sleep((GRACE_SEC + 1) * 1000);
+    expect(await presenceDms()).toEqual([]);
+    // The CLI really did reach the room.
+    expect((await history()).map((m) => m.body)).toEqual(expect.arrayContaining(["turn ended", "turn ended again"]));
+    // That DM to the lead is real mail; move the lead's cursor past it so the
+    // later wait tests see only presence DMs.
+    await cli("wait", roomId, "--name", "lead", "--init");
   });
 
   it("the lead's own subscribe/disconnect never alerts (admin)", async () => {

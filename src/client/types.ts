@@ -30,6 +30,13 @@ export interface JoinCloudOptions {
 export interface JoinRoomOptions {
   name: string;
   password?: string;
+  /**
+   * Open the room's SSE stream (default true). One-shot callers (the CLI's
+   * send, history, unread, join --detach) pass false: they never read the
+   * stream, and on our fork every SSE subscription counts toward the
+   * presence watchdog, so a brief one would later be reported as an outage.
+   */
+  subscribe?: boolean;
 }
 
 export interface CreateRoomOptions {

@@ -67,6 +67,11 @@ export class PresenceTracker {
     return this.entries.get(this.key(roomId, agentName))?.count ?? 0;
   }
 
+  /** Has this agent ever had an SSE subscriber (since it last left)? */
+  tracked(roomId: string, agentName: string): boolean {
+    return this.entries.has(this.key(roomId, agentName));
+  }
+
   /** Is a grace timer pending for this agent? */
   pending(roomId: string, agentName: string): boolean {
     return this.entries.get(this.key(roomId, agentName))?.timer !== undefined;
