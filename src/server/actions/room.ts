@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { JoinCloudServer } from "../server.js";
 import type { Store } from "../storage/interface.js";
-import { botNotify } from "../bot.js";
+import { botNotify, getPresence } from "../bot.js";
 import { getMissedMessages } from "../helpers.js";
 
 const RESERVED = ["a2a", "mcp", "docs"];
@@ -181,6 +181,7 @@ export function registerRoomMethods(server: JoinCloudServer) {
       const removed = await ctx.store.removeAgentByToken(params.agentToken);
       if (!removed) throw new Error("Failed to leave room");
 
+      getPresence()?.forgetAgent(agent.roomId, agent.name);
       await botNotify(agent.roomId, `${agent.name} left the room`);
       return {
         text: `Left room ${agent.roomId}`,
@@ -308,6 +309,7 @@ export function registerRoomMethods(server: JoinCloudServer) {
       if (!exists) throw new Error(`Agent "${params.targetAgent}" not found in room`);
 
       await ctx.store.removeAgent(admin.roomId, params.targetAgent);
+      getPresence()?.forgetAgent(admin.roomId, params.targetAgent);
       await botNotify(admin.roomId, `${admin.name} kicked ${params.targetAgent} from the room`);
 
       return {

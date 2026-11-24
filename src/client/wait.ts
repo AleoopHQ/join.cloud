@@ -43,12 +43,14 @@ function escapeRegExp(s: string): string {
  *   `@worker-1` does not match `@worker-12`, and `foo@worker-1` (an email-ish
  *   token) does not count as a mention.
  *
- * Never my own messages, never the server's `room-bot` join/leave notices, and
- * never a DM to someone else even if it mentions me -- that conversation is
- * not mine to be woken by.
+ * Never my own messages, never the server's `room-bot` broadcasts (join/leave
+ * notices), and never a DM to someone else even if it mentions me -- that
+ * conversation is not mine to be woken by. A `room-bot` DM to me (the presence
+ * watchdog's alerts to admins) does count.
  */
 export function isAddressedTo(msg: Pick<Message, "from" | "to" | "body">, me: string): boolean {
-  if (msg.from === me || msg.from === "room-bot") return false;
+  if (msg.from === me) return false;
+  if (msg.from === "room-bot") return msg.to === me;
   if (msg.to) return msg.to === me;
   const names = [me, "all"].map(escapeRegExp).join("|");
   const re = new RegExp(`(^|[^\\w@.-])@(${names})(?![\\w-])`, "i");

@@ -1,10 +1,36 @@
 import type { Store } from "./storage/interface.js";
 import type { RoomMessage } from "./types.js";
+import { PresenceTracker, parseGraceSec } from "./presence.js";
 
 let _store: Store;
+let _presence: PresenceTracker | undefined;
 
 export function setBotStore(store: Store): void {
   _store = store;
+  _presence?.reset();
+  _presence = createPresenceTracker(parseGraceSec(process.env.JOINCLOUD_PRESENCE_GRACE_SEC) * 1000);
+}
+
+/** The presence watchdog (Aleoop fork), wired to the bot store. See presence.ts. */
+export function createPresenceTracker(graceMs: number): PresenceTracker {
+  return new PresenceTracker({
+    graceMs,
+    getRole: async (roomId, agentName) => {
+      const agents = await _store.getRoomAgents(roomId);
+      return agents.find((a) => a.name === agentName)?.role;
+    },
+    getAdmins: async (roomId) => {
+      if (!(await _store.getRoomById(roomId))) return [];
+      const agents = await _store.getRoomAgents(roomId);
+      return agents.filter((a) => a.role === "admin").map((a) => a.name);
+    },
+    sendDm: (roomId, to, body) => botNotify(roomId, body, to),
+  });
+}
+
+/** The live presence tracker, if the server has been started. */
+export function getPresence(): PresenceTracker | undefined {
+  return _presence;
 }
 
 // SSE connections: roomId -> set of writers
@@ -37,15 +63,17 @@ export function addBroadcastListener(listener: BroadcastListener): () => void {
 }
 
 export function cleanupRoomConnections(roomId: string): void {
+  _presence?.forgetRoom(roomId);
   sseClients.delete(roomId);
   roomListeners.delete(roomId);
 }
 
-export async function botNotify(roomId: string, body: string): Promise<void> {
+export async function botNotify(roomId: string, body: string, to?: string): Promise<void> {
   const msg: RoomMessage = {
     id: crypto.randomUUID(),
     roomId,
     from: "room-bot",
+    ...(to && { to }),
     body,
     timestamp: new Date().toISOString(),
   };
