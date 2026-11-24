@@ -117,7 +117,7 @@ export class JoinCloud {
       saveToken(this.serverUrl, roomName, options.name, agentToken);
     }
 
-    const room = new Room(this, roomName, roomId, options.name, agentToken, joinedAt);
+    const room = new Room(this, roomName, roomId, options.name, agentToken, joinedAt, options.subscribe ?? true);
     await room.connected();
     return room;
   }
@@ -136,7 +136,7 @@ export class Room extends EventEmitter {
   private hasMessageListener = false;
   private joinedAt: string;
 
-  constructor(client: JoinCloud, roomName: string, roomId: string, agentName: string, agentToken: string, joinedAt: string) {
+  constructor(client: JoinCloud, roomName: string, roomId: string, agentName: string, agentToken: string, joinedAt: string, subscribe = true) {
     super();
     this.client = client;
     this.roomName = roomName;
@@ -144,7 +144,9 @@ export class Room extends EventEmitter {
     this.agentName = agentName;
     this.agentToken = agentToken;
     this.joinedAt = joinedAt;
-    this.connectPromise = this.subscribe();
+    // Without a stream, send/history/unread still work (they are plain RPC);
+    // only "message" events never fire.
+    this.connectPromise = subscribe ? this.subscribe() : Promise.resolve();
   }
 
   on(event: string | symbol, listener: (...args: any[]) => void): this {

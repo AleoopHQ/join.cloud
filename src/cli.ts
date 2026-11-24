@@ -91,13 +91,13 @@ if (hasFlag("server")) {
         let result: { messages: any[]; total: number };
         if (saved) {
           const jc2 = new JoinCloud(serverUrl, { persist: true });
-          const histRoom = await jc2.joinRoom(room, { name: saved.name, password: flag("password") });
+          const histRoom = await jc2.joinRoom(room, { name: saved.name, password: flag("password"), subscribe: false });
           result = await histRoom.getHistory({ ...(limit && { limit }) });
           histRoom.close(); // else its SSE stream keeps the process alive
         } else {
           const tempName = `cli-${Date.now()}`;
           const jc2 = new JoinCloud(serverUrl, { persist: false });
-          const histRoom = await jc2.joinRoom(room, { name: tempName, password: flag("password") });
+          const histRoom = await jc2.joinRoom(room, { name: tempName, password: flag("password"), subscribe: false });
           result = await histRoom.getHistory({ ...(limit && { limit }) });
           await histRoom.leave();
         }
@@ -116,7 +116,7 @@ if (hasFlag("server")) {
         const saved = findTokenForRoom(serverUrl, room);
         if (!saved) { console.error("You must join the room first. Use: joincloud join <room> --name <name>"); process.exit(1); }
         const jc2 = new JoinCloud(serverUrl, { persist: true });
-        const unreadRoom = await jc2.joinRoom(room, { name: saved.name, password: flag("password") });
+        const unreadRoom = await jc2.joinRoom(room, { name: saved.name, password: flag("password"), subscribe: false });
         const unreadResult = await unreadRoom.getUnread();
         unreadRoom.close(); // else its SSE stream keeps the process alive
         if (unreadResult.messages.length === 0) {
@@ -138,7 +138,8 @@ if (hasFlag("server")) {
           console.error("Usage: joincloud join <room> --name <name>");
           process.exit(1);
         }
-        const joined = await client.joinRoom(room, { name, password: flag("password") });
+        // Only the interactive join reads the stream. --detach is one-shot.
+        const joined = await client.joinRoom(room, { name, password: flag("password"), subscribe: !hasFlag("detach") });
         if (hasFlag("detach")) {
           // Non-interactive: join (or reconnect with the saved token), persist
           // the token under both the room id and what was typed, print it, exit.
@@ -183,7 +184,9 @@ if (hasFlag("server")) {
           console.error('Usage: joincloud send <room> "text" --name <name>');
           process.exit(1);
         }
-        const joined = await client.joinRoom(room, { name, password: flag("password") });
+        // No SSE: the RPC result is the ack, and a brief stream would count
+        // as a listener that then "disappeared" (presence watchdog).
+        const joined = await client.joinRoom(room, { name, password: flag("password"), subscribe: false });
         await joined.send(text, { to: flag("to") });
         joined.close();
         console.log("Message sent.");

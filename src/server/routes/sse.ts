@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { Store } from "../storage/interface.js";
-import { addSseClient } from "../bot.js";
+import { addSseClient, getPresence } from "../bot.js";
 
 export function createSseRoutes(store: Store): Hono {
   const app = new Hono();
@@ -21,6 +21,8 @@ export function createSseRoutes(store: Store): Hono {
       const remove = addSseClient(room.id, (data) => {
         stream.writeSSE({ data }).catch(() => {});
       });
+      // Presence watchdog: one subscriber of this agent name (Aleoop fork).
+      const unsubscribe = getPresence()?.subscribe(room.id, agent.name) ?? (() => {});
 
       const keepAlive = setInterval(() => {
         stream.writeSSE({ data: "", event: "ping" }).catch(() => {});
@@ -28,6 +30,7 @@ export function createSseRoutes(store: Store): Hono {
 
       stream.onAbort(() => {
         remove();
+        unsubscribe();
         clearInterval(keepAlive);
       });
 

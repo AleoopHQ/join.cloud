@@ -37,6 +37,11 @@ describe("wait: isAddressedTo", () => {
     expect(isAddressedTo(m("@worker-1", { from: "worker-1" }), "worker-1")).toBe(false);
     expect(isAddressedTo(m("@worker-1 joined", { from: "room-bot" }), "worker-1")).toBe(false);
   });
+  it("matches a room-bot DM to me (presence alerts), but not one to someone else", () => {
+    expect(isAddressedTo(m("[presence] worker-1 is listening again.", { from: "room-bot", to: "lead" }), "lead")).toBe(true);
+    expect(isAddressedTo(m("[presence] @lead", { from: "room-bot", to: "lead-2" }), "lead")).toBe(false);
+    expect(isAddressedTo(m("@all heads up", { from: "room-bot" }), "lead")).toBe(false);
+  });
   it("ignores a DM to someone else even if it mentions me", () => {
     expect(isAddressedTo(m("ask @worker-1", { to: "worker-2" }), "worker-1")).toBe(false);
   });
